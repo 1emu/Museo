@@ -8,6 +8,8 @@
 #ifndef STRUCTURES_H_
 #define STRUCTURES_H_
 
+#include "Defaults.h"
+
 #define ADDRESSES_LENGTH 256
 #define NAMES_LENGTH 32
 
@@ -24,9 +26,11 @@ typedef struct{
 } QueueMessage;
 
 typedef struct{
-	bool productionFinished = false;
-	int item;
-} Store;
+	int capacity;
+	int inside;
+	int last;
+	int queue[DOORS_AMOUNT];
+} Museum;
 
 enum Items {PROCESSOR, MOTHERBOARD, DISK};
 enum Actions {PRODUCE, END};
