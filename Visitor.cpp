@@ -12,12 +12,23 @@
 using namespace std;
 
 void outputMuseumStatus(int id, Museum* museum) {
-	string museumStatus = "Museum status [";
+	string museumStatus = "Museum: Cap = [";
 	museumStatus += Utils::intToString(museum->inside);
 	museumStatus += "/";
 	museumStatus += Utils::intToString(museum->capacity);
-	museumStatus += "];";
+	museumStatus += "] and ";
+	museumStatus += "Queue = [";
+	museumStatus += Utils::intToString(museum->queue[0]);
+	museumStatus += "|";
+	museumStatus += Utils::intToString(museum->queue[1]);
+	museumStatus += "|";
+	museumStatus += Utils::intToString(museum->queue[2]);
+	museumStatus += "]";
 	Process::announce(PROCESS_NAME, id, GREEN, museumStatus.c_str());
+}
+
+bool thereIsCapacityInside(Museum* museum) {
+	return museum->capacity > museum->inside;
 }
 
 int main(int argc, char** argv) {
@@ -62,39 +73,46 @@ int main(int argc, char** argv) {
 
 	Process::announce(PROCESS_NAME, id, UNDERLINEDGREEN, "ipcs succesfully created.");
 
-	Process::announce(PROCESS_NAME, id, YELLOW, "trying to get inside.");
-	mutex->wait();
-
+	string enterMessage = "Trying to enter through door " + Utils::intToString(doorNumber);
+	Process::announce(PROCESS_NAME, id, YELLOW, enterMessage.c_str());
 	outputMuseumStatus(id, museum);
 
-	if(museum->capacity > museum-> inside) {
-		museum->inside++;
-		mutex->post();
-	} else{
+	mutex->wait();
+	outputMuseumStatus(id, museum);
+
+	if(!thereIsCapacityInside(museum)) {
 		string waitMessage = "Cannot enter: waiting at door " + Utils::intToString(doorNumber);
 		Process::announce(PROCESS_NAME, id, YELLOW, waitMessage.c_str());
 	 	museum->queue[doorNumber]++;
 	  	mutex->post();
 	  	doors->wait(doorNumber);
+	  	mutex->wait();
+	  	museum->queue[doorNumber]--;
 	}
 
-	Process::announce(PROCESS_NAME, id, UNDERLINEDYELLOW, "got inside");
-
+	//visit
+	Process::announce(PROCESS_NAME, id, YELLOW, "got inside");
+	museum->inside++;
 	sleep(Process::sleepTime()); //visit
+	mutex->post();
 
+	// exit
 	mutex->wait();
-
 	museum->inside--;
 
-	for(int i = (museum->last+1)%3, j = 0; j < 3; i=(i+1)%3, j++){
-		if(museum->queue[i] > 0 and museum->capacity > museum->inside){
-			string exitMessage = "Exiting through door " + Utils::intToString(doorNumber);
+	int nextDoorToBeFreed = (museum->last + 1) % 3;
+	int i = nextDoorToBeFreed;
+	bool gotOut = false;
+	for (int j = 0; j < 3 and !gotOut; j++) {
+		bool peopleWaitingAtDoor = museum->queue[i] > 0;
+		if (peopleWaitingAtDoor and thereIsCapacityInside(museum)) {
+			string exitMessage = "Exiting through door " + Utils::intToString(i);
 			Process::announce(PROCESS_NAME, id, YELLOW, exitMessage.c_str());
-			museum->queue[i]--;
 			doors->post(i);
-			museum->inside++;
 			museum->last = i;
+			gotOut = true;
 		}
+		i = (i + 1) % 3; // calculate next door
 	}
 
 	outputMuseumStatus(id, museum);
